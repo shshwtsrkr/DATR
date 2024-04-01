@@ -300,13 +300,19 @@ class DATR(BaseSeq):
 
     def training_step(self, batch, batch_idx) -> STEP_OUTPUT:
         images, labels = batch
-        images1 = self.preprocess_images(images)  
-        labels1 = labels
-        images2, indices = self.similar_cosine_batch(images1)
-        indices_list = indices.tolist()
-        labels2 = [labels[i] for i in indices_list]
-
-
+        images1, images2 = torch.tensor_split(images, 2)
+        images1 = self.preprocess_images(images1)
+        n = int(len(labels)/2)
+        labels1 = labels[:n]
+        labels2 = labels[n:]
+        images1_flat = images1.view(images1.size(0), -1)
+        images2_flat = images2.view(images2.size(0), -1)
+        similarity = torch.matmul(images1_flat, images2_flat.T)
+        similarity = F.cosine_similarity(images1_flat[:, None, :], images2_flat[None, :, :], dim=-1)
+        _, indices = torch.max(similarity, dim=1)
+        labels2 = [labels2[i] for i in indices]
+        images2 = images2[indices]
+        
         #HELPER CLIP
         helper_tgt = self.tokenizer.encode(labels2, self._device)
 
@@ -356,11 +362,11 @@ class DATR(BaseSeq):
         """
         
         #MCE
-        linear_transform = nn.Linear(in_features=helper_clip_embed.shape[-1], out_features=primary_clip_embed.shape[-1]).to('cuda')
-        clip_embed = linear_transform(helper_clip_embed)
+        # linear_transform = nn.Linear(in_features=helper_clip_embed.shape[-1], out_features=primary_clip_embed.shape[-1]).to('cuda')
+        # clip_embed = linear_transform(helper_clip_embed)
 
         #PCE
-        # clip_embed = primary_clip_embed
+        clip_embed = primary_clip_embed
         
         #PFL
         # f_list = primary_f_list
@@ -377,7 +383,7 @@ class DATR(BaseSeq):
         #PFLV
         f_list_vis = primary_f_list_vis
         
-        memory_list = self.encode(images)
+        memory_list = self.encode(images1)
 
         perm = self.gen_tgt_perms(tgt)
         tgt_in = tgt[:, :-1]

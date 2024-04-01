@@ -44,7 +44,7 @@ def _get_config(experiment: str, **kwargs):
 
 
 def _get_model_class(key):
-    if 'baseseq' in key or 'clipocr' in key:
+    if 'baseseq' in key or 'datr' in key:
         from .baseseq.system import BaseSeq as ModelClass
     elif 'abinet' in key:
         from .abinet.system import ABINet as ModelClass
